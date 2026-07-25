@@ -28,10 +28,19 @@ Qeymatban با استفاده از هوش مصنوعی، قیمت یک ملک ر
 - SaaS برای دفاتر و پلتفرم‌های آگهی (B2B)
 - API ارزش‌گذاری برای مؤسسات مالی و بازیگران بزرگ‌تر بازار
 
+## ساختار پروژه
+
+```
+backend/    FastAPI + مدل ارزش‌گذاری (Python)
+frontend/   پنل Next.js
+docs/       چشم‌انداز و معماری فنی
+```
+
 ## مستندات بیشتر
 
-توضیح کامل چشم‌انداز و منطق محصول در [`docs/vision.md`](docs/vision.md).
+- چشم‌انداز کامل محصول: [`docs/vision.md`](docs/vision.md)
+- معماری فنی و stack: [`docs/architecture.md`](docs/architecture.md)
 
 ## وضعیت
 
-پروژه در مرحله اولیه (ideation / early-stage) است. ساختار فنی (backend، مدل داده، pipeline ارزش‌گذاری) هنوز تعیین نشده.
+پروژه در مرحله اولیه (ideation / early-stage) است. stack فنی تعیین شده (Next.js + FastAPI + PostgreSQL/PostGIS)؛ پیاده‌سازی مدل ارزش‌گذاری و پنل در جریان است.
