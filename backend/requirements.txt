@@ -6,3 +6,6 @@ scikit-learn
 shap
 psycopg2-binary
 sqlalchemy
+pandas
+numpy
+joblib
