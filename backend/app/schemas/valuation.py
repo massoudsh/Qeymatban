@@ -4,11 +4,11 @@ from pydantic import BaseModel, Field
 class PropertyFeatures(BaseModel):
     """ویژگی‌های ورودی یک ملک برای ارزش‌گذاری (باید با FEATURE_COLUMNS همخوان باشد)."""
 
-    area_sqm: float
-    year_built: int
-    floor: int
-    total_floors: int
-    rooms: int
+    area_sqm: float = Field(gt=0, le=5000)
+    year_built: int = Field(ge=1300, le=1500)
+    floor: int = Field(ge=-5, le=200)
+    total_floors: int = Field(ge=1, le=200)
+    rooms: int = Field(ge=0, le=30)
     has_parking: bool = False
     has_elevator: bool = False
     has_storage: bool = False
@@ -27,5 +27,12 @@ class ValuationResponse(BaseModel):
     price_low: float
     price_mid: float
     price_high: float
+    confidence_level: float
+    model_version: str
     feature_contributions: dict[str, float]
     comparables: list[ComparableResult]
+
+
+class ModelStatusResponse(BaseModel):
+    ready: bool
+    model_version: str | None = None

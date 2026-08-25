@@ -15,17 +15,19 @@ class ComparablesFinder:
     def __init__(self, n_neighbors: int = 5) -> None:
         self.n_neighbors = n_neighbors
         self.scaler = StandardScaler()
-        self.nn = NearestNeighbors(n_neighbors=n_neighbors, metric="cosine")
+        self.nn = NearestNeighbors(metric="cosine")
         self._ids: list[str] = []
+        self._fitted_neighbors = 0
 
     def fit(self, df: pd.DataFrame, id_col: str = "id") -> None:
         X = self.scaler.fit_transform(df[FEATURE_COLUMNS])
+        self._fitted_neighbors = min(self.n_neighbors, len(df))
         self.nn.fit(X)
         self._ids = df[id_col].astype(str).tolist()
 
     def find(self, target: pd.DataFrame) -> list[list[dict]]:
         X = self.scaler.transform(target[FEATURE_COLUMNS])
-        distances, indices = self.nn.kneighbors(X, n_neighbors=self.n_neighbors)
+        distances, indices = self.nn.kneighbors(X, n_neighbors=self._fitted_neighbors)
         return [
             [
                 {"id": self._ids[i], "similarity": float(1 - d)}

@@ -31,7 +31,11 @@ Next.js (پنل/فرانت)  →  FastAPI (Python, API + مدل ارزش‌گذ�
 ## وضعیت پیاده‌سازی
 
 - [x] تصمیم stack نهایی شد
-- [ ] اسکلت FastAPI (`backend/`)
-- [ ] اسکلت Next.js (`frontend/`) — نصب و build واقعی باید روی سرور SSH انجام شود، نه داخل کانتینر
-- [ ] طراحی schema اولیه PostgreSQL/PostGIS
-- [ ] pipeline اولیه مدل قیمت‌گذاری
+- [x] FastAPI با endpoint ارزش‌گذاری، model status و API key
+- [x] پنل Next.js مدرن و RTL با proxy امن سمت سرور
+- [x] طراحی schema اولیه PostgreSQL/PostGIS
+- [x] pipeline اولیه مدل قیمت‌گذاری و artifact نسخه‌دار
+- [x] import/validation داده و گزارش MAE/MAPE آموزش
+- [x] CI برای تست backend و type-check frontend
+- [ ] تأمین داده واقعی معاملات و آموزش مدل production
+- [ ] اتصال persistence API به PostgreSQL و استقرار production

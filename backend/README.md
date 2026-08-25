@@ -1,34 +1,45 @@
 # Qeymatban Backend
 
-API و مدل ارزش‌گذاری (FastAPI + Python).
+API و pipeline نسخه‌پذیر ارزش‌گذاری (FastAPI + Python).
 
-## اجرا (روی سرور، نه داخل کانتینر توسعه)
+## اجرا (روی سرور)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
+## آماده‌سازی داده و مدل
+
+ورودی شریک داده باید CSV و شامل `sold_price` و همه ستون‌های ویژگی باشد. ابتدا داده را اعتبارسنجی و یکدست کنید، سپس مدل نسخه‌دار بسازید:
+
+```bash
+python -m app.scripts.import_transactions raw.csv data/transactions.csv
+python -m app.scripts.train_model data/transactions.csv --output-dir models
+ln -sfn valuation-<version>.joblib models/current.joblib
+```
+
+هر artifact شامل مدل قیمت، مدل‌های quantile، جست‌وجوی فایل مشابه و نسخه مدل است. فایل JSON کنار آن MAE و MAPE داده validation را نگه می‌دارد. حداقل ۲۰ معامله معتبر لازم است؛ داده واقعی داخل repository ذخیره نمی‌شود.
+
+## API
+
+- `GET /health` — سلامت process
+- `GET /v1/model/status` — آمادگی و نسخه مدل
+- `POST /v1/valuations` — بازه قیمت، confidence، SHAP و comparables
+
+اگر `QEYMATBAN_API_KEYS` تنظیم شود، endpoint ارزش‌گذاری هدر `X-API-Key` معتبر می‌خواهد. چند کلید با کاما جدا می‌شوند.
+
 ## دیتابیس
 
-Schema اولیه در [`migrations/001_init.sql`](migrations/001_init.sql) — نیازمند PostgreSQL 15+ با پسوند‌های `postgis` و `pgvector`.
+Schema اولیه در `migrations/001_init.sql` نیازمند PostgreSQL 15+، PostGIS و pgvector است. جداول اصلی: `properties`، `transactions`، `valuations` و `valuation_comparables`.
 
-جداول اصلی:
-- `properties` — هر فایل/ملک (فعال یا فروخته‌شده) با موقعیت جغرافیایی و ویژگی‌ها
-- `transactions` — معاملات واقعاً بسته‌شده (داده آموزشی مدل)
-- `valuations` — خروجی مدل: بازه قیمت، عدم قطعیت، SHAP values (audit trail قابل دفاع)
-- `valuation_comparables` — فایل‌های مشابه استفاده‌شده در هر ارزش‌گذاری
+## تست
 
-## Pipeline مدل ارزش‌گذاری (`app/ml/`)
-
-| ماژول | نقش |
-|---|---|
-| `pricing_pipeline.py` | مدل پایه قیمت (XGBoost regression) |
-| `uncertainty.py` | بازه قیمت با quantile regression (XGBoost) |
-| `comparables.py` | فایل‌های مشابه با شباهت برداری (StandardScaler + NearestNeighbors) |
-| `explain.py` | سهم هر ویژگی در قیمت (SHAP) |
-| `valuation_service.py` | orchestrator: `fit(historical_df)` سپس `valuate(target_df)` |
-
-نکته: این pipeline هنوز به هیچ endpoint وصل نشده چون داده آموزشی واقعی (از جدول `transactions`) موجود نیست. وقتی داده جمع‌آوری شد، `ValuationService` باید در startup اپ لود/train شود و از طریق یک endpoint (مثلاً `POST /valuations`) در دسترس قرار گیرد.
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+ruff check app tests
+```
