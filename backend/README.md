@@ -11,6 +11,15 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+برای اجرای محلی بدون PostgreSQL، API به‌صورت پیش‌فرض از SQLite در فایل `qeymatban.db` استفاده می‌کند. برای محیط واقعی، متغیر `DATABASE_URL` را روی connection string PostgreSQL تنظیم کنید.
+
+Endpointهای اصلی:
+- `GET /health` — بررسی سلامت سرویس
+- `GET /dashboard` — آمار پنل و فایل‌های مشابه
+- `POST /valuations` — ذخیره ملک و ارزش‌گذاری آن
+
+فرم Next.js با `NEXT_PUBLIC_API_URL` به API متصل می‌شود؛ مقدار پیش‌فرض آن `http://localhost:8000` است.
+
 ## دیتابیس
 
 Schema اولیه در [`migrations/001_init.sql`](migrations/001_init.sql) — نیازمند PostgreSQL 15+ با پسوند‌های `postgis` و `pgvector`.
