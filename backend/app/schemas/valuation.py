@@ -18,6 +18,14 @@ class PropertyFeatures(BaseModel):
     access_score: int = Field(ge=1, le=5)
 
 
+class ValuationRequest(PropertyFeatures):
+    """اطلاعات ملک که از فرم ارزش‌گذاری وارد می‌شود."""
+
+    neighborhood: str = Field(min_length=1, max_length=100)
+    city: str = Field(default="تهران", max_length=100)
+    title: str = Field(default="ملک جدید", max_length=200)
+
+
 class ComparableResult(BaseModel):
     id: str
     similarity: float
