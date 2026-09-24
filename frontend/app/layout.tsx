@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "قیمت‌بان | ارزش‌گذاری توضیح‌پذیر ملک",
-  description: "بازه قیمت، فایل‌های مشابه و عوامل اثرگذار بر ارزش ملک",
+  description: "داشبورد فیروزه‌ای قیمت‌بان برای ارزش‌گذاری داده‌محور املاک",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="fa" dir="rtl">
-      <body>{children}</body>
+      <body className="vibefarsiTurquoise">{children}</body>
     </html>
   );
 }
