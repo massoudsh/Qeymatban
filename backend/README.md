@@ -28,13 +28,13 @@ ln -sfn valuation-<version>.joblib models/current.joblib
 
 - `GET /health` — سلامت process
 - `GET /v1/model/status` — آمادگی و نسخه مدل
-- `POST /v1/valuations` — بازه قیمت، confidence، SHAP و comparables
+- `POST /v1/valuations` — بازه قیمت، confidence، SHAP، comparables و `valuation_id` ذخیره‌شده
 
 اگر `QEYMATBAN_API_KEYS` تنظیم شود، endpoint ارزش‌گذاری هدر `X-API-Key` معتبر می‌خواهد. چند کلید با کاما جدا می‌شوند.
 
 ## دیتابیس
 
-Schema اولیه در `migrations/001_init.sql` نیازمند PostgreSQL 15+، PostGIS و pgvector است. جداول اصلی: `properties`، `transactions`، `valuations` و `valuation_comparables`.
+Schema اولیه در `migrations/001_init.sql` نیازمند PostgreSQL 15+، PostGIS و pgvector است. در اجرای محلی، `DATABASE_URL` به‌صورت پیش‌فرض SQLite است و API هنگام startup جدول‌ها را می‌سازد. جداول اصلی: `properties`، `transactions`، `valuations` و `valuation_comparables`. هر درخواست موفق `POST /v1/valuations` ملک، نتیجه مدل و comparables معتبر را ذخیره می‌کند.
 
 ## تست
 

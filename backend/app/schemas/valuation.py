@@ -21,7 +21,7 @@ class PropertyFeatures(BaseModel):
 class ValuationRequest(PropertyFeatures):
     """اطلاعات ملک که از فرم ارزش‌گذاری وارد می‌شود."""
 
-    neighborhood: str = Field(min_length=1, max_length=100)
+    neighborhood: str = Field(default="نامشخص", min_length=1, max_length=100)
     city: str = Field(default="تهران", max_length=100)
     title: str = Field(default="ملک جدید", max_length=200)
 
@@ -39,6 +39,7 @@ class ValuationResponse(BaseModel):
     model_version: str
     feature_contributions: dict[str, float]
     comparables: list[ComparableResult]
+    valuation_id: str | None = None
 
 
 class ModelStatusResponse(BaseModel):
