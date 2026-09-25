@@ -37,5 +37,6 @@ Next.js (پنل/فرانت)  →  FastAPI (Python, API + مدل ارزش‌گذ�
 - [x] pipeline اولیه مدل قیمت‌گذاری و artifact نسخه‌دار
 - [x] import/validation داده و گزارش MAE/MAPE آموزش
 - [x] CI برای تست backend و type-check frontend
+- [x] اتصال persistence API به دیتابیس برای ذخیره property و valuation
 - [ ] تأمین داده واقعی معاملات و آموزش مدل production
-- [ ] اتصال persistence API به PostgreSQL و استقرار production
+- [ ] استقرار production و زمان‌بندی retrain دوره‌ای
