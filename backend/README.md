@@ -24,6 +24,19 @@ ln -sfn valuation-<version>.joblib models/current.joblib
 
 هر artifact شامل مدل قیمت، مدل‌های quantile، جست‌وجوی فایل مشابه و نسخه مدل است. فایل JSON کنار آن MAE و MAPE داده validation را نگه می‌دارد. حداقل ۲۰ معامله معتبر لازم است؛ داده واقعی داخل repository ذخیره نمی‌شود.
 
+## Benchmark تکرارپذیر مدل‌ها
+
+برای مقایسهٔ منصفانهٔ XGBoost، CatBoost، LightGBM و TabPFN، ابتدا dataset مصنوعی seedدار تولید و هر مدل با split زمانی و holdout محله ارزیابی می‌شود. معیار انتخاب، میانگین MAPE دو split است؛ ensemble ساخته نمی‌شود و فقط مدل برنده وارد artifact می‌شود.
+
+```bash
+python -m app.scripts.benchmark_models --rows 2400 --seed 42 --output-dir benchmarks
+python -m app.scripts.train_model benchmarks/mock-transactions.csv \
+  --benchmark-winner benchmarks/benchmark-winner.json --output-dir models
+ln -sfn valuation-<version>.joblib models/current.joblib
+```
+
+`mock-transactions.csv` فقط برای اعتبارسنجی فنی است و نباید معیار کیفیت یا مدل production تلقی شود. برای دادهٔ واقعی، همان benchmark را روی معاملات بسته‌شدهٔ canonical اجرا کنید و سپس winner file آن را به `train_model` بدهید.
+
 ## API
 
 - `GET /health` — سلامت process

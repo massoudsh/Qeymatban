@@ -18,9 +18,10 @@ class ValuationService:
         result = service.valuate(target_df) # target_df یک ردیف با ستون‌های FEATURE_COLUMNS
     """
 
-    def __init__(self, model_version: str = "unversioned") -> None:
+    def __init__(self, model_version: str = "unversioned", model_family: str = "xgboost") -> None:
         self.model_version = model_version
-        self.pricing_model = PricingModel()
+        self.model_family = model_family
+        self.pricing_model = PricingModel(model_family=model_family)
         self.uncertainty = UncertaintyEstimator()
         self.comparables = ComparablesFinder()
 
@@ -34,7 +35,11 @@ class ValuationService:
         low_predictions, high_predictions = self.uncertainty.predict_interval(target_property)
         price_low = min(float(low_predictions[0]), price_mid)
         price_high = max(float(high_predictions[0]), price_mid)
-        shap_contrib = explain_prediction(self.pricing_model.model, target_property)
+        shap_contrib = explain_prediction(
+            self.pricing_model.model,
+            target_property,
+            feature_baseline=self.pricing_model.feature_baseline,
+        )
         comps = self.comparables.find(target_property)[0]
 
         return {

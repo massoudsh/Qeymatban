@@ -38,5 +38,6 @@ Next.js (پنل/فرانت)  →  FastAPI (Python, API + مدل ارزش‌گذ�
 - [x] import/validation داده و گزارش MAE/MAPE آموزش
 - [x] CI برای تست backend و type-check frontend
 - [x] اتصال persistence API به دیتابیس برای ذخیره property و valuation
-- [ ] تأمین داده واقعی معاملات و آموزش مدل production
+- [x] benchmark تکرارپذیر XGBoost/CatBoost/LightGBM/TabPFN با دادهٔ mock و split زمانی/محله‌ای
+- [ ] تأمین داده واقعی معاملات، اجرای benchmark واقعی و آموزش مدل production
 - [ ] استقرار production و زمان‌بندی retrain دوره‌ای
