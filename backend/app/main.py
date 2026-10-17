@@ -8,7 +8,16 @@ import pandas as pd
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db import Property, SessionLocal, Valuation, ValuationComparable, create_tables, seed_demo_properties
+from app.db import (
+    IS_POSTGRES,
+    Property,
+    SessionLocal,
+    Valuation,
+    ValuationComparable,
+    create_tables,
+    seed_demo_properties,
+    upgrade_postgres_schema,
+)
 from app.ml.valuation_service import ValuationService
 from app.schemas.valuation import (
     DashboardStatsResponse,
@@ -34,6 +43,8 @@ def require_api_key(x_api_key: Annotated[str | None, Header()] = None) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
+    if IS_POSTGRES:
+        upgrade_postgres_schema()
     seed_demo_properties()
     model_path = Path(os.getenv("QEYMATBAN_MODEL_PATH", "models/current.joblib"))
     app.state.valuation_service = ValuationService.load(model_path) if model_path.is_file() else None
@@ -124,7 +135,7 @@ def model_status(request: Request) -> ModelStatusResponse:
     dependencies=[Depends(require_api_key)],
 )
 def valuation_stats() -> DashboardStatsResponse:
-    thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
+    thirty_days_ago = (datetime.now(UTC) - timedelta(days=30)).replace(tzinfo=None)
     with SessionLocal() as session:
         all_valuations = session.query(Valuation).all()
     mids = sorted(item.price_mid for item in all_valuations)
@@ -134,7 +145,7 @@ def valuation_stats() -> DashboardStatsResponse:
         average_confidence=(
             sum(item.confidence_level for item in all_valuations) / len(all_valuations) if all_valuations else None
         ),
-        last_30_days=sum(1 for item in all_valuations if item.created_at.replace(tzinfo=UTC) >= thirty_days_ago),
+        last_30_days=sum(1 for item in all_valuations if item.created_at >= thirty_days_ago),
         median_price_mid=median,
     )
 

@@ -42,12 +42,24 @@ ln -sfn valuation-<version>.joblib models/current.joblib
 - `GET /health` — سلامت process
 - `GET /v1/model/status` — آمادگی و نسخه مدل
 - `POST /v1/valuations` — بازه قیمت، confidence، SHAP، comparables و `valuation_id` ذخیره‌شده
+- `GET /v1/valuations?limit=20` — تاریخچهٔ ارزش‌گذاری‌ها برای داشبورد
+- `GET /v1/valuations/stats` — تعداد، میانگین confidence، تحلیل‌های ۳۰ روز اخیر و میانهٔ قیمت
 
-اگر `QEYMATBAN_API_KEYS` تنظیم شود، endpoint ارزش‌گذاری هدر `X-API-Key` معتبر می‌خواهد. چند کلید با کاما جدا می‌شوند.
+اگر `QEYMATBAN_API_KEYS` تنظیم شود، همهٔ endpointهای `/v1/valuations` هدر `X-API-Key` معتبر می‌خواهند. چند کلید با کاما جدا می‌شوند.
 
 ## دیتابیس
 
 Schema اولیه در `migrations/001_init.sql` نیازمند PostgreSQL 15+، PostGIS و pgvector است. در اجرای محلی، `DATABASE_URL` به‌صورت پیش‌فرض SQLite است و API هنگام startup جدول‌ها را می‌سازد. جداول اصلی: `properties`، `transactions`، `valuations` و `valuation_comparables`. هر درخواست موفق `POST /v1/valuations` ملک، نتیجه مدل و comparables معتبر را ذخیره می‌کند.
+
+### PostgreSQL
+
+```bash
+export DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/qeymatban
+psql "$DATABASE_URL" -f migrations/001_init.sql   # فقط برای دیتابیس خالی
+psql "$DATABASE_URL" -f migrations/002_orm_alignment.sql  # دیتابیس موجود
+```
+
+مدل‌های ORM روی PostgreSQL از نوع `uuid` استفاده می‌کنند و با SQLite (`CHAR(36)`) سازگارند. هنگام startup، ستون‌های ORM که در schema قدیمی نیستند (`listed_price`, `status`, `created_at`, `updated_at`, `confidence_level`) بدون حذف داده اضافه می‌شوند. `upgrade_postgres_schema()` هیچ مایگریشن مخربی اجرا نمی‌کند.
 
 ## تست
 

@@ -2,16 +2,29 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, create_engine, select
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, create_engine, select, text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./qeymatban.db")
+IS_POSTGRES = DATABASE_URL.startswith(("postgresql", "postgres"))
+
+if IS_POSTGRES:
+    from sqlalchemy.dialects.postgresql import UUID as PGUUID
+
+    IdType = PGUUID(as_uuid=False)
+else:
+    IdType = String(36)
+
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Base(DeclarativeBase):
@@ -21,7 +34,7 @@ class Base(DeclarativeBase):
 class Property(Base):
     __tablename__ = "properties"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(IdType, primary_key=True, default=lambda: str(uuid.uuid4()))
     title: Mapped[str] = mapped_column(String(200), default="ملک جدید")
     address: Mapped[str | None] = mapped_column(String(300), nullable=True)
     neighborhood: Mapped[str] = mapped_column(String(100), index=True)
@@ -40,8 +53,8 @@ class Property(Base):
     access_score: Mapped[int] = mapped_column(Integer)
     listed_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     transactions: Mapped[list[Transaction]] = relationship(back_populates="property", cascade="all, delete-orphan")
     valuations: Mapped[list[Valuation]] = relationship(back_populates="property", cascade="all, delete-orphan")
@@ -50,7 +63,7 @@ class Property(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(IdType, primary_key=True, default=lambda: str(uuid.uuid4()))
     property_id: Mapped[str] = mapped_column(ForeignKey("properties.id", ondelete="CASCADE"), index=True)
     sold_price: Mapped[float] = mapped_column(Float)
     sold_date: Mapped[date] = mapped_column(Date)
@@ -61,15 +74,15 @@ class Transaction(Base):
 class Valuation(Base):
     __tablename__ = "valuations"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(IdType, primary_key=True, default=lambda: str(uuid.uuid4()))
     property_id: Mapped[str] = mapped_column(ForeignKey("properties.id", ondelete="CASCADE"), index=True)
     price_low: Mapped[float] = mapped_column(Float)
     price_mid: Mapped[float] = mapped_column(Float)
     price_high: Mapped[float] = mapped_column(Float)
     confidence_level: Mapped[float] = mapped_column(Float, default=0.8)
     shap_values: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    model_version: Mapped[str] = mapped_column(String(100), default="heuristic-v1")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    model_version: Mapped[str] = mapped_column(String(100), default="unversioned")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     property: Mapped[Property] = relationship(back_populates="valuations")
     comparables: Mapped[list[ValuationComparable]] = relationship(cascade="all, delete-orphan")
 
@@ -85,6 +98,42 @@ class ValuationComparable(Base):
 
 def create_tables() -> None:
     Base.metadata.create_all(bind=engine)
+
+
+def upgrade_postgres_schema() -> list[str]:
+    """Add ORM columns missing from an older hand-written schema, without dropping data."""
+    if not IS_POSTGRES:
+        return []
+    statements = {
+        "properties": {
+            "listed_price": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS listed_price NUMERIC(16,0)",
+            "status": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'",
+            "created_at": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
+            "updated_at": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()",
+        },
+        "valuations": {
+            "confidence_level": "ALTER TABLE valuations ADD COLUMN IF NOT EXISTS confidence_level NUMERIC(4,3) NOT NULL DEFAULT 0.8",
+            "created_at": "ALTER TABLE valuations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
+        },
+    }
+    added: list[str] = []
+    with engine.begin() as connection:
+        for table, definitions in statements.items():
+            exists = connection.execute(text("SELECT to_regclass(:name)"), {"name": table}).scalar()
+            if exists is None:
+                continue
+            existing = {
+                row[0]
+                for row in connection.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = :name"),
+                    {"name": table},
+                )
+            }
+            for column, statement in definitions.items():
+                if column not in existing:
+                    connection.execute(text(statement))
+                    added.append(f"{table}.{column}")
+    return added
 
 
 def seed_demo_properties() -> None:
