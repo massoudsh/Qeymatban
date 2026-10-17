@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -9,7 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import Property, SessionLocal, Valuation, ValuationComparable, create_tables, seed_demo_properties
 from app.ml.valuation_service import ValuationService
-from app.schemas.valuation import ModelStatusResponse, PropertyFeatures, ValuationRequest, ValuationResponse
+from app.schemas.valuation import (
+    DashboardStatsResponse,
+    ModelStatusResponse,
+    PropertyFeatures,
+    ValuationHistoryItem,
+    ValuationHistoryResponse,
+    ValuationRequest,
+    ValuationResponse,
+)
 
 
 def _configured_api_keys() -> set[str]:
@@ -43,6 +52,21 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "X-API-Key"],
 )
+
+
+def _history_item(valuation: Valuation, property_record: Property) -> ValuationHistoryItem:
+    return ValuationHistoryItem(
+        valuation_id=valuation.id,
+        property_id=property_record.id,
+        title=property_record.title,
+        neighborhood=property_record.neighborhood,
+        created_at=valuation.created_at.isoformat(),
+        price_low=valuation.price_low,
+        price_mid=valuation.price_mid,
+        price_high=valuation.price_high,
+        confidence_level=valuation.confidence_level,
+        model_version=valuation.model_version,
+    )
 
 
 def _persist_valuation(features: ValuationRequest, result: dict) -> str:
@@ -92,6 +116,44 @@ def model_status(request: Request) -> ModelStatusResponse:
         ready=service is not None,
         model_version=service.model_version if service else None,
     )
+
+
+@app.get(
+    "/v1/valuations/stats",
+    response_model=DashboardStatsResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def valuation_stats() -> DashboardStatsResponse:
+    thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
+    with SessionLocal() as session:
+        all_valuations = session.query(Valuation).all()
+    mids = sorted(item.price_mid for item in all_valuations)
+    median = mids[len(mids) // 2] if mids else None
+    return DashboardStatsResponse(
+        total_valuations=len(all_valuations),
+        average_confidence=(
+            sum(item.confidence_level for item in all_valuations) / len(all_valuations) if all_valuations else None
+        ),
+        last_30_days=sum(1 for item in all_valuations if item.created_at.replace(tzinfo=UTC) >= thirty_days_ago),
+        median_price_mid=median,
+    )
+
+
+@app.get(
+    "/v1/valuations",
+    response_model=ValuationHistoryResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def list_valuations(limit: int = 20) -> ValuationHistoryResponse:
+    with SessionLocal() as session:
+        rows = (
+            session.query(Valuation, Property)
+            .join(Property, Valuation.property_id == Property.id)
+            .order_by(Valuation.created_at.desc())
+            .limit(max(1, min(limit, 100)))
+            .all()
+        )
+    return ValuationHistoryResponse(items=[_history_item(valuation, property_record) for valuation, property_record in rows])
 
 
 @app.post(

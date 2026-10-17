@@ -45,3 +45,27 @@ class ValuationResponse(BaseModel):
 class ModelStatusResponse(BaseModel):
     ready: bool
     model_version: str | None = None
+
+
+class ValuationHistoryItem(BaseModel):
+    valuation_id: str
+    property_id: str
+    title: str
+    neighborhood: str
+    created_at: str
+    price_low: float
+    price_mid: float
+    price_high: float
+    confidence_level: float
+    model_version: str
+
+
+class ValuationHistoryResponse(BaseModel):
+    items: list[ValuationHistoryItem]
+
+
+class DashboardStatsResponse(BaseModel):
+    total_valuations: int
+    average_confidence: float | None = None
+    last_30_days: int
+    median_price_mid: float | None = None

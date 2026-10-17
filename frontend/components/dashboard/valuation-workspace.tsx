@@ -10,10 +10,10 @@ import { Progress } from "../ui/progress";
 type NumericField = "area_sqm" | "year_built" | "floor" | "total_floors" | "rooms" | "light_score" | "view_score" | "access_score";
 type Valuation = { price_low: number; price_mid: number; price_high: number; confidence_level: number; model_version: string; feature_contributions: Record<string, number>; comparables: Array<{ id: string; similarity: number }> };
 
-type FormState = { area_sqm: number; year_built: number; floor: number; total_floors: number; rooms: number; has_parking: boolean; has_elevator: boolean; has_storage: boolean; renovated: boolean; light_score: number; view_score: number; access_score: number };
+type FormState = { title: string; neighborhood: string; city: string; area_sqm: number; year_built: number; floor: number; total_floors: number; rooms: number; has_parking: boolean; has_elevator: boolean; has_storage: boolean; renovated: boolean; light_score: number; view_score: number; access_score: number };
 
 const labels: Record<string, string> = { area_sqm: "متراژ", year_built: "سال ساخت", floor: "طبقه", total_floors: "تعداد طبقات", rooms: "تعداد خواب", has_parking: "پارکینگ", has_elevator: "آسانسور", has_storage: "انباری", renovated: "بازسازی", light_score: "نورگیری", view_score: "چشم‌انداز", access_score: "دسترسی" };
-const initialForm: FormState = { area_sqm: 92, year_built: 1397, floor: 3, total_floors: 6, rooms: 2, has_parking: true, has_elevator: true, has_storage: true, renovated: false, light_score: 4, view_score: 3, access_score: 4 };
+const initialForm: FormState = { title: "آپارتمان جدید", neighborhood: "نیاوران", city: "تهران", area_sqm: 92, year_built: 1397, floor: 3, total_floors: 6, rooms: 2, has_parking: true, has_elevator: true, has_storage: true, renovated: false, light_score: 4, view_score: 3, access_score: 4 };
 const money = (value: number) => new Intl.NumberFormat("fa-IR", { notation: "compact", maximumFractionDigits: 1 }).format(value) + " تومان";
 const percent = (value: number) => new Intl.NumberFormat("fa-IR", { style: "percent", maximumFractionDigits: 0 }).format(value);
 
@@ -42,6 +42,10 @@ export function ValuationWorkspace({ compact = false }: { compact?: boolean }) {
     <Card className="valuationFormCard">
       <div className="cardHeading"><div className="stepNumber">۱</div><div><span className="sectionKicker">ورودی تحلیل</span><h2>مشخصات ملک</h2><p>اطلاعات دقیق‌تر، تحلیل قابل اتکاتر</p></div></div>
       <form onSubmit={submit}>
+        <div className="fieldGrid">
+          <label>عنوان ملک<input type="text" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
+          <label>محله<input type="text" value={form.neighborhood} onChange={(event) => setForm((current) => ({ ...current, neighborhood: event.target.value }))} /></label>
+        </div>
         <div className="fieldGrid">
           {(["area_sqm", "year_built", "floor", "total_floors", "rooms"] as NumericField[]).map((key) => <label key={key}>{labels[key]}<input type="number" min={key === "year_built" ? 1300 : 0} value={form[key]} onChange={(event) => setNumber(key, event.target.value)} /></label>)}
         </div>
