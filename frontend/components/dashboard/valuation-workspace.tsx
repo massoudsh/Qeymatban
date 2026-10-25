@@ -8,7 +8,7 @@ import { Card } from "../ui/card";
 import { Progress } from "../ui/progress";
 
 type NumericField = "area_sqm" | "year_built" | "floor" | "total_floors" | "rooms" | "light_score" | "view_score" | "access_score";
-type Valuation = { price_low: number; price_mid: number; price_high: number; confidence_level: number; model_version: string; feature_contributions: Record<string, number>; comparables: Array<{ id: string; similarity: number }> };
+type Valuation = { price_low: number; price_mid: number; price_high: number; price_per_sqm: number; confidence_level: number; model_version: string; feature_contributions: Record<string, number>; comparables: Array<{ id: string; similarity: number }>; market_context: { neighborhood: string; sample_size: number; median_price_per_sqm: number | null; source: string; measured_at: string } };
 
 type FormState = { title: string; neighborhood: string; city: string; area_sqm: number; year_built: number; floor: number; total_floors: number; rooms: number; has_parking: boolean; has_elevator: boolean; has_storage: boolean; renovated: boolean; light_score: number; view_score: number; access_score: number };
 
@@ -21,9 +21,12 @@ export function ValuationWorkspace({ compact = false }: { compact?: boolean }) {
   const [form, setForm] = useState<FormState>(initialForm);
   const [result, setResult] = useState<Valuation | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scenario, setScenario] = useState<"base" | "renovated" | "quick_sale">("base");
   const [error, setError] = useState("");
   const contributions = useMemo(() => Object.entries(result?.feature_contributions ?? {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 6), [result]);
   const maxContribution = Math.max(1, ...contributions.map(([, value]) => Math.abs(value)));
+  const scenarioFactor = scenario === "renovated" ? 1.06 : scenario === "quick_sale" ? 0.94 : 1;
+  const scenarioPrice = result ? result.price_mid * scenarioFactor : 0;
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setLoading(true); setError("");
@@ -57,7 +60,9 @@ export function ValuationWorkspace({ compact = false }: { compact?: boolean }) {
     </Card>
     <Card className={`valuationResultCard ${result ? "hasResult" : ""}`} aria-live="polite">
       {!result ? <div className="emptyResult"><div className="emptyChart"><i /><i /><i /><i /></div><span className="sectionKicker">نتیجهٔ تحلیل</span><h2>تحلیل شما اینجا شکل می‌گیرد</h2><p>مشخصات ملک را وارد کنید تا بازهٔ قیمت و منطق پشت آن را ببینید.</p><div className="skeletonLines"><i /><i /><i /></div></div> : <>
-        <div className="resultTop"><div><span className="sectionKicker">برآورد مدل</span><h2>{money(result.price_mid)}</h2><p>قیمت میانی پیشنهادی</p></div><Badge tone="success">اطمینان {percent(result.confidence_level)}</Badge></div>
+        <div className="resultTop"><div><span className="sectionKicker">برآورد مدل</span><h2>{money(scenarioPrice)}</h2><p>قیمت میانی سناریوی انتخاب‌شده</p></div><div className="resultActions"><Badge tone="success">اطمینان {percent(result.confidence_level)}</Badge><button className="printButton" type="button" onClick={() => window.print()}>چاپ گزارش</button></div></div>
+        <div className="scenarioBox"><div className="subsectionHeading"><h3>سناریوی تصمیم</h3><span>برای مقایسه، مدل را دوباره آموزش نمی‌دهیم</span></div><div className="scenarioOptions"><button type="button" className={scenario === "base" ? "selected" : ""} onClick={() => setScenario("base")}>وضعیت فعلی</button><button type="button" className={scenario === "renovated" ? "selected" : ""} onClick={() => setScenario("renovated")}>بازسازی‌شده <small>+۶٪</small></button><button type="button" className={scenario === "quick_sale" ? "selected" : ""} onClick={() => setScenario("quick_sale")}>فروش سریع <small>−۶٪</small></button></div></div>
+        <div className="marketContext"><div><span>قیمت هر متر</span><strong>{money(result.price_per_sqm)}</strong></div><div><span>محله</span><strong>{result.market_context.neighborhood}</strong></div><div><span>نمونهٔ مرجع</span><strong>{new Intl.NumberFormat("fa-IR").format(result.market_context.sample_size)} فایل</strong></div></div>
         <div className="priceRange"><span className="rangeTrack" /><span className="rangeDot" /><div><strong>{money(result.price_low)}</strong><small>کف بازه</small></div><div><strong>{money(result.price_high)}</strong><small>سقف بازه</small></div></div>
         <div className="analysisSection"><div className="subsectionHeading"><h3>چه چیزی قیمت را ساخته؟</h3><span>سهم ویژگی‌ها</span></div>{contributions.map(([key, value]) => <div className="factorRow" key={key}><span>{labels[key] ?? key}</span><Progress value={Math.abs(value) / maxContribution * 100} tone={value < 0 ? "coral" : "turquoise"} /><strong className={value < 0 ? "negativeValue" : ""}>{value >= 0 ? "+" : "−"}{money(Math.abs(value))}</strong></div>)}</div>
         <div className="comparablesSection"><div className="subsectionHeading"><h3>فایل‌های مشابه</h3><span>بر اساس شباهت برداری</span></div>{result.comparables.slice(0, 3).map((item, index) => <div className="comparableRow" key={item.id}><span className="comparableIndex">{new Intl.NumberFormat("fa-IR").format(index + 1)}</span><code>{item.id.slice(0, 12)}</code><b>{percent(item.similarity)} شباهت</b></div>)}</div>

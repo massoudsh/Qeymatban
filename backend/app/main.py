@@ -80,6 +80,24 @@ def _history_item(valuation: Valuation, property_record: Property) -> ValuationH
     )
 
 
+def _market_context(features: ValuationRequest) -> dict:
+    with SessionLocal() as session:
+        records = session.query(Property).filter(
+            Property.city == features.city,
+            Property.neighborhood == features.neighborhood,
+            Property.listed_price.is_not(None),
+            Property.area_sqm > 0,
+        ).all()
+    prices_per_sqm = sorted(record.listed_price / record.area_sqm for record in records if record.listed_price)
+    return {
+        "neighborhood": features.neighborhood,
+        "sample_size": len(prices_per_sqm),
+        "median_price_per_sqm": prices_per_sqm[len(prices_per_sqm) // 2] if prices_per_sqm else None,
+        "source": "ثبت‌شده در قیمت‌بان" if prices_per_sqm else "دادهٔ محله هنوز کافی نیست",
+        "measured_at": datetime.now(UTC).isoformat(),
+    }
+
+
 def _persist_valuation(features: ValuationRequest, result: dict) -> str:
     with SessionLocal() as session:
         property_record = Property(**features.model_dump())
@@ -182,5 +200,7 @@ def create_valuation(features: ValuationRequest, request: Request) -> ValuationR
 
     feature_frame = pd.DataFrame([PropertyFeatures.model_validate(features.model_dump()).model_dump()])
     result = service.valuate(feature_frame)
+    result["price_per_sqm"] = result["price_mid"] / features.area_sqm
+    result["market_context"] = _market_context(features)
     result["valuation_id"] = _persist_valuation(features, result)
     return ValuationResponse.model_validate(result)

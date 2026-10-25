@@ -31,14 +31,24 @@ class ComparableResult(BaseModel):
     similarity: float
 
 
+class MarketContext(BaseModel):
+    neighborhood: str
+    sample_size: int
+    median_price_per_sqm: float | None = None
+    source: str
+    measured_at: str
+
+
 class ValuationResponse(BaseModel):
     price_low: float
     price_mid: float
     price_high: float
+    price_per_sqm: float
     confidence_level: float
     model_version: str
     feature_contributions: dict[str, float]
     comparables: list[ComparableResult]
+    market_context: MarketContext
     valuation_id: str | None = None
 
 
