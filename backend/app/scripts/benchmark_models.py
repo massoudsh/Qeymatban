@@ -131,11 +131,14 @@ def benchmark(frame: pd.DataFrame) -> list[BenchmarkResult]:
     return results
 
 
-def run(rows: int, seed: int, output_dir: Path) -> dict[str, object]:
-    frame = generate_mock_transactions(rows=rows, seed=seed)
+def run(rows: int, seed: int, output_dir: Path, data_path: Path | None = None) -> dict[str, object]:
+    frame = generate_mock_transactions(rows=rows, seed=seed) if data_path is None else pd.read_csv(data_path)
+    missing = sorted({*FEATURE_COLUMNS, "neighborhood", "sold_date", "sold_price"} - set(frame.columns))
+    if missing:
+        raise ValueError(f"Missing benchmark columns: {', '.join(missing)}")
     output_dir.mkdir(parents=True, exist_ok=True)
-    data_path = output_dir / "mock-transactions.csv"
-    frame.to_csv(data_path, index=False)
+    normalized_data_path = output_dir / ("mock-transactions.csv" if data_path is None else "benchmark-transactions.csv")
+    frame.to_csv(normalized_data_path, index=False)
     results = benchmark(frame)
     eligible = [item for item in results if item.status == "ok"]
     if not eligible:
@@ -145,7 +148,7 @@ def run(rows: int, seed: int, output_dir: Path) -> dict[str, object]:
         "generated_at": datetime.now(UTC).isoformat(),
         "seed": seed,
         "rows": rows,
-        "data": str(data_path),
+        "data": str(normalized_data_path),
         "selection_metric": "mean of temporal and neighborhood MAPE",
         "winner": winner.model_family,
         "results": [asdict(item) for item in results],
@@ -163,8 +166,9 @@ def main() -> None:
     parser.add_argument("--rows", type=int, default=2400)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", type=Path, default=Path("benchmarks"))
+    parser.add_argument("--data", type=Path, help="Validated transaction CSV for a real-data benchmark")
     args = parser.parse_args()
-    print(json.dumps(run(args.rows, args.seed, args.output_dir), ensure_ascii=False, indent=2))
+    print(json.dumps(run(args.rows, args.seed, args.output_dir, args.data), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

@@ -24,6 +24,18 @@ def test_normalize_transactions_writes_valid_training_schema(tmp_path):
     assert output.loc[0, "sold_price"] == 100_000_000
 
 
+def test_normalize_transactions_rejects_invalid_floor(tmp_path):
+    source = tmp_path / "raw.csv"
+    destination = tmp_path / "transactions.csv"
+    frame = valid_frame()
+    frame.loc[0, "floor"] = 4
+    frame.loc[0, "total_floors"] = 3
+    frame.to_csv(source, index=False)
+
+    with pytest.raises(ValueError, match="floor"):
+        normalize_transactions(source, destination)
+
+
 def test_normalize_transactions_rejects_invalid_scores(tmp_path):
     source = tmp_path / "raw.csv"
     destination = tmp_path / "transactions.csv"

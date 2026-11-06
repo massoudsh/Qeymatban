@@ -1,7 +1,9 @@
 """Train and version a valuation artifact from canonical transaction data."""
 
 import argparse
+import hashlib
 import json
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,7 +19,9 @@ def train(
     output_dir: Path,
     version: str | None = None,
     model_family: str = "xgboost",
+    promote: bool = False,
 ) -> dict[str, object]:
+    data_bytes = data_path.read_bytes()
     frame = pd.read_csv(data_path)
     required = {"id", "sold_price", *FEATURE_COLUMNS}
     missing = sorted(required - set(frame.columns))
@@ -46,6 +50,7 @@ def train(
         "trained_at": datetime.now(UTC).isoformat(),
         "training_rows": len(train_frame),
         "validation_rows": len(validation_frame),
+        "dataset_sha256": hashlib.sha256(data_bytes).hexdigest(),
         "mae": float(mean_absolute_error(validation_frame["sold_price"], predictions)),
         "mape": float(mean_absolute_percentage_error(validation_frame["sold_price"], predictions)),
     }
@@ -53,10 +58,16 @@ def train(
     output_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = output_dir / f"valuation-{model_version}.joblib"
     service.save(artifact_path)
-    (output_dir / f"valuation-{model_version}.json").write_text(
+    metadata_path = output_dir / f"valuation-{model_version}.json"
+    metadata_path.write_text(
         json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    return {**metrics, "artifact": str(artifact_path)}
+    if promote:
+        shutil.copyfile(artifact_path, output_dir / "current.joblib")
+        (output_dir / "current.json").write_text(
+            json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    return {**metrics, "artifact": str(artifact_path), "promoted": promote}
 
 
 def model_family_from_benchmark(path: Path) -> str:
@@ -74,9 +85,10 @@ def main() -> None:
     parser.add_argument("--version")
     parser.add_argument("--model-family", choices=MODEL_FAMILIES, default="xgboost")
     parser.add_argument("--benchmark-winner", type=Path)
+    parser.add_argument("--promote", action="store_true", help="Copy the artifact to current.joblib")
     args = parser.parse_args()
     model_family = model_family_from_benchmark(args.benchmark_winner) if args.benchmark_winner else args.model_family
-    print(json.dumps(train(args.data, args.output_dir, args.version, model_family), ensure_ascii=False, indent=2))
+    print(json.dumps(train(args.data, args.output_dir, args.version, model_family, args.promote), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
