@@ -12,6 +12,24 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
+## اجرا با Docker
+
+از ریشهٔ پروژه:
+
+```bash
+docker compose up --build backend   # همراه با سرویس db
+```
+
+تصویر چندمرحله‌ای است، با کاربر غیرروت (`qeymatban`) اجرا می‌شود و entrypoint پیش از بالا آمدن API، مالکیت volumeها را اصلاح و تا آماده‌شدن PostgreSQL صبر می‌کند. مسیرهای پیش‌فرض داخل کانتینر: `/app/models` (artifact)، `/app/data` (CSV و SQLite fallback) و `/app/benchmarks`.
+
+```bash
+docker compose run --rm backend python -m app.scripts.train_model /app/data/transactions.csv --output-dir /app/models --promote
+docker compose restart backend
+docker build --target dev -t qeymatban-backend:dev . && docker run --rm qeymatban-backend:dev   # pytest
+```
+
+تصویر runtime کل requirements از جمله TabPFN/PyTorch را نصب می‌کند؛ برای کاهش حجم، `tabpfn` را حذف کنید.
+
 ## آماده‌سازی داده و مدل
 
 ورودی شریک داده باید CSV و شامل `sold_price` و همه ستون‌های ویژگی باشد. ابتدا داده را اعتبارسنجی و یکدست کنید، سپس مدل نسخه‌دار بسازید:

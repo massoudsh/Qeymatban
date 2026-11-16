@@ -31,6 +31,14 @@ npm install
 npm run dev
 ```
 
+## Docker
+
+```bash
+docker compose up --build frontend   # از ریشهٔ پروژه
+```
+
+تصویر multi-stage است و از خروجی `output: "standalone"` استفاده می‌کند؛ کانتینر با کاربر غیرروت اجرا می‌شود و healthcheck روی `/api/health` است. متغیر `QEYMATBAN_API_URL` در زمان اجرا خوانده می‌شود، پس همان تصویر را می‌توان به هر بک‌اندی وصل کرد.
+
 متغیر `QEYMATBAN_API_URL` آدرس داخلی FastAPI است. اگر API key فعال است، آن را در `QEYMATBAN_API_KEY` قرار دهید؛ این مقدار فقط در route سمت سرور خوانده می‌شود و به مرورگر ارسال نمی‌شود.
 
 ## اعتبارسنجی

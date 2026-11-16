@@ -43,6 +43,16 @@ Next.js (پنل/فرانت)  →  FastAPI (Python, API + مدل ارزش‌گذ�
 - `train_model.py --promote` artifact نسخه‌دار و metadata شامل SHA-256 داده را تولید و نسخهٔ انتخاب‌شده را به `models/current.joblib` تبدیل می‌کند.
 - دادهٔ مصنوعی برای اعتبارسنجی فنی است و نباید برای تصمیم قیمت‌گذاری production استفاده شود.
 
+## استقرار با Docker
+
+- `compose.yaml` سه سرویس دارد: `db` (PostGIS + pgvector)، `backend` (FastAPI) و `frontend` (Next.js standalone).
+- تصویر backend چندمرحله‌ای است: وابستگی‌ها در venv ساخته و به تصویر نهایی منتقل می‌شوند؛ اپ با کاربر غیرروت اجرا می‌شود و entrypoint مالکیت volumeهای `models` و `appdata` را اصلاح و تا آماده‌شدن PostgreSQL صبر می‌کند.
+- تصویر frontend از خروجی `output: "standalone"` استفاده می‌کند و healthcheck آن روی `/api/health` است؛ این route مستقل از API اصلی پاسخ می‌دهد.
+- تصویر دیتابیس از `postgis/postgis:16-3.5` ساخته و `postgresql-16-pgvector` را نصب می‌کند؛ اسکریپت init فقط پسوندها را می‌سازد.
+- جدول‌ها با `Base.metadata.create_all` ساخته می‌شوند؛ `001_init.sql` نسخهٔ کامل جغرافیایی است و به‌دلیل `location NOT NULL` نباید پیش از ORM روی محیط فعلی اجرا شود.
+- پورت دیتابیس منتشر نمی‌شود؛ پورت API و پنل با `BACKEND_PORT`/`FRONTEND_PORT` قابل تنظیم است.
+- تصویر runtime شامل TabPFN/PyTorch است؛ برای کاهش حجم می‌توان `tabpfn` را از requirements حذف کرد.
+
 ## پاک‌سازی ساختار
 
 - `frontend/next.config.mjs` حذف شد؛ `frontend/next.config.ts` تنها منبع تنظیمات Next.js است.
