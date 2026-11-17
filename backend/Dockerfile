@@ -36,12 +36,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     QEYMATBAN_MODEL_PATH=/app/models/current.joblib \
     DATABASE_URL=sqlite:////app/data/qeymatban.db
 
-# libgomp1 is required by the XGBoost and LightGBM wheels.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 curl gosu
-
+# No apt packages. The XGBoost wheel vendors the libgomp it needs
+# (xgboost.libs/libgomp-*.so.1.0.0, resolved through $ORIGIN/../../xgboost.libs),
+# so the runtime image is pure python:3.12-slim and needs no Debian archive at all.
 RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin qeymatban
 
 COPY --from=builder /opt/venv /opt/venv
@@ -49,24 +46,35 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=qeymatban:qeymatban app ./app
 COPY --chown=qeymatban:qeymatban migrations ./migrations
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-COPY docker/wait_for_db.py /usr/local/bin/wait_for_db.py
+COPY docker/entrypoint.py docker/wait_for_db.py /usr/local/bin/
 
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && mkdir -p /app/models /app/data /app/benchmarks \
-    && chown qeymatban:qeymatban /app/models /app/data /app/benchmarks
+RUN mkdir -p /app/models /app/data /app/benchmarks \
+    && chown -R qeymatban:qeymatban /app/models /app/data /app/benchmarks
+
+# Starts as root only to fix volume ownership, then execs as qeymatban (uid 10001).
+ENTRYPOINT ["python", "/usr/local/bin/entrypoint.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 EXPOSE 8000
 
+# Uses the interpreter already in the image; no curl dependency.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8000/health || exit 1
-
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)" || exit 1
 
 
 # Same image plus CatBoost/LightGBM for the model benchmark.
+# Unlike the XGBoost wheel, the LightGBM wheel does NOT vendor libgomp
+# (its lib_lightgbm.so has no RUNPATH), so this target needs the apt package.
+# It is opt-in via the `tools` compose profile, so the slow apt layer never
+# blocks a normal `docker compose up`.
 FROM runtime AS benchmark
+
+USER root
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::Retries=10 update \
+    && apt-get -o Acquire::Retries=10 install -y --no-install-recommends libgomp1
 
 COPY --from=benchmark-builder /opt/venv /opt/venv
 
@@ -79,4 +87,5 @@ COPY requirements.txt requirements-dev.txt /tmp/
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r /tmp/requirements-dev.txt
 
+# The entrypoint still drops to qeymatban before running the tests.
 CMD ["pytest", "-q", "-p", "no:cacheprovider", "tests"]

@@ -45,10 +45,11 @@ Next.js (پنل/فرانت)  →  FastAPI (Python, API + مدل ارزش‌گذ�
 
 ## استقرار با Docker
 
-- `compose.yaml` سه سرویس دارد: `db` (PostGIS + pgvector)، `backend` (FastAPI) و `frontend` (Next.js standalone).
+- `compose.yaml` سه سرویس دارد: `db` (تصویر چندمعماری `postgres:16`)، `backend` (FastAPI) و `frontend` (Next.js standalone). کد فعلی به PostGIS/pgvector وابسته نیست؛ برای schema جغرافیایی از `compose.geo.yaml` استفاده می‌شود.
 - تصویر backend چندمرحله‌ای است: وابستگی‌ها در venv ساخته و به تصویر نهایی منتقل می‌شوند؛ اپ با کاربر غیرروت اجرا می‌شود و entrypoint مالکیت volumeهای `models` و `appdata` را اصلاح و تا آماده‌شدن PostgreSQL صبر می‌کند.
 - تصویر frontend از خروجی `output: "standalone"` استفاده می‌کند و healthcheck آن روی `/api/health` است؛ این route مستقل از API اصلی پاسخ می‌دهد.
-- تصویر دیتابیس از `postgis/postgis:16-3.5` ساخته و `postgresql-16-pgvector` را نصب می‌کند؛ اسکریپت init فقط پسوندها را می‌سازد.
+- تصویر دیتابیس پیش‌فرض official `postgres:16` است و اسکریپت init فقط `pgcrypto` را می‌سازد. override اختیاری `compose.geo.yaml` تصویر `postgis/postgis` را با `pgvector` فعال می‌کند؛ چون آن تصویر فقط amd64 است، در ARM شبیه‌سازی و کند است.
+- تصویر backend هیچ بستهٔ apt ندارد؛ wheel رسمی XGBoost `libgomp` را همراه دارد. فقط target `benchmark` برای LightGBM به `libgomp1` نیاز دارد.
 - جدول‌ها با `Base.metadata.create_all` ساخته می‌شوند؛ `001_init.sql` نسخهٔ کامل جغرافیایی است و به‌دلیل `location NOT NULL` نباید پیش از ORM روی محیط فعلی اجرا شود.
 - پورت دیتابیس منتشر نمی‌شود؛ پورت API و پنل با `BACKEND_PORT`/`FRONTEND_PORT` قابل تنظیم است.
 - تصویر runtime شامل TabPFN/PyTorch است؛ برای کاهش حجم می‌توان `tabpfn` را از requirements حذف کرد.

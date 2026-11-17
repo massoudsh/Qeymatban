@@ -39,7 +39,7 @@ compose.yaml  استک کامل Docker: دیتابیس + API + پنل
 
 ## اجرا با Docker
 
-کل استک (PostgreSQL با PostGIS و pgvector، API و پنل) با Compose بالا می‌آید:
+کل استک (PostgreSQL، API و پنل) با Compose بالا می‌آید:
 
 ```bash
 cp .env.example .env      # رمز دیتابیس و کلیدهای API را تنظیم کنید
@@ -57,7 +57,15 @@ docker compose up --build
 - داده‌های دیتابیس، artifact مدل، خروجی benchmark و فایل‌های دادهٔ برنامه در volumeهای `pgdata`، `models`، `benchmarks` و `appdata` نگه‌داری می‌شوند.
 - API بدون artifact مدل بالا می‌آید ولی `POST /v1/valuations` پاسخ 503 می‌دهد تا مدل آموزش داده شود.
 - جدول‌ها هنگام startup از ORM ساخته می‌شوند. `backend/migrations/001_init.sql` نسخهٔ کامل جغرافیایی است و فقط وقتی ستون‌های `location` و `feature_embedding` واقعاً پر می‌شوند باید اجرا شود؛ اجرای آن پیش از ORM به‌دلیل `location NOT NULL` با نوشتن‌های فعلی API سازگار نیست.
+- سرویس `db` تصویر رسمی و چندمعماری `postgres:16` است، چون کد فعلی به PostGIS یا pgvector وابسته نیست (comparables در حافظه محاسبه می‌شود). تصویر `postgis/postgis` فقط amd64 است و روی Apple Silicon با شبیه‌سازی و نصب pgvector ده‌ها دقیقه طول می‌کشید. وقتی واقعاً به PostGIS/pgvector نیاز داشتید:
+
+  ```bash
+  docker compose -f compose.yaml -f compose.geo.yaml up -d --build
+  ```
 - تصویر API فقط وابستگی‌های سرویس‌دهی را نصب می‌کند (XGBoost، SHAP، scikit-learn)؛ CatBoost، LightGBM و TabPFN فقط برای benchmark لازم‌اند و در تصویر جدا مانده‌اند.
+- تصویر API هیچ بستهٔ apt نصب نمی‌کند: wheel رسمی XGBoost خودش `libgomp` را همراه دارد و از طریق `$ORIGIN/../../xgboost.libs` پیدا می‌شود. پس بیلد به `deb.debian.org` وابسته نیست.
+- تنها جایی که apt لازم است target `benchmark` است، چون wheel لایت‌جی‌بی‌ام `libgomp` را همراه ندارد؛ آن سرویس در پروفایل `tools` است و `docker compose up` عادی آن را build نمی‌کند.
+- کانتینر با root شروع می‌شود تا مالکیت volumeها را درست کند و سپس با `setuid` به کاربر `qeymatban` می‌افتد؛ `curl` و `gosu` در تصویر نیستند.
 
 ### آموزش مدل داخل کانتینر
 

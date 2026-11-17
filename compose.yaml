@@ -13,8 +13,9 @@ x-backend-volumes: &backend-volumes
 
 services:
   db:
-    build:
-      context: ./docker/db
+    # Stock multi-arch image: no emulation, no apt install, no pgvector build.
+    # For PostGIS/pgvector use compose.geo.yaml (see README).
+    image: postgres:16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-qeymatban}
       POSTGRES_USER: ${POSTGRES_USER:-qeymatban}

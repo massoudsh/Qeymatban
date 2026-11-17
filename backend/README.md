@@ -20,7 +20,13 @@ uvicorn app.main:app --reload
 docker compose up --build backend   # همراه با سرویس db
 ```
 
-تصویر چندمرحله‌ای است، با کاربر غیرروت (`qeymatban`) اجرا می‌شود و entrypoint پیش از بالا آمدن API، مالکیت volumeها را اصلاح و تا آماده‌شدن PostgreSQL صبر می‌کند. مسیرهای پیش‌فرض داخل کانتینر: `/app/models` (artifact)، `/app/data` (CSV و SQLite fallback) و `/app/benchmarks`.
+تصویر چندمرحله‌ای است. کانتینر با root شروع می‌شود تا مالکیت volumeها را اصلاح کند، سپس `docker/entrypoint.py` با `setuid` به `qeymatban` (uid 10001) می‌افتد. مسیرهای پیش‌فرض داخل کانتینر: `/app/models` (artifact)، `/app/data` (CSV و SQLite fallback) و `/app/benchmarks`.
+
+تصویر runtime هیچ بستهٔ apt ندارد؛ wheel رسمی XGBoost خودش `libgomp` را همراه دارد. فقط target `benchmark` به `libgomp1` نیاز دارد (wheel LightGBM آن را همراه ندارد) و آن هم opt-in است. اگر PyPI کند است، میرور بدهید:
+
+```bash
+docker build --build-arg PIP_INDEX_URL=https://mirror.example/simple -t qeymatban-backend .
+```
 
 ```bash
 docker compose run --rm backend python -m app.scripts.train_model /app/data/transactions.csv --output-dir /app/models --promote
@@ -70,7 +76,7 @@ ln -sfn valuation-<version>.joblib models/current.joblib
 
 ## دیتابیس
 
-Schema اولیه در `migrations/001_init.sql` نیازمند PostgreSQL 15+، PostGIS و pgvector است. در اجرای محلی، `DATABASE_URL` به‌صورت پیش‌فرض SQLite است و API هنگام startup جدول‌ها را می‌سازد. جداول اصلی: `properties`، `transactions`، `valuations` و `valuation_comparables`. هر درخواست موفق `POST /v1/valuations` ملک، نتیجه مدل و comparables معتبر را ذخیره می‌کند.
+Schema اولیه در `migrations/001_init.sql` نیازمند PostgreSQL 15+، PostGIS و pgvector است. ارجاع Docker به‌صورت پیش‌فرض `postgres:16` ساده است؛ برای PostGIS/pgvector از `compose.geo.yaml` استفاده کنید. در اجرای محلی، `DATABASE_URL` به‌صورت پیش‌فرض SQLite است و API هنگام startup جدول‌ها را می‌سازد. جداول اصلی: `properties`، `transactions`، `valuations` و `valuation_comparables`. هر درخواست موفق `POST /v1/valuations` ملک، نتیجه مدل و comparables معتبر را ذخیره می‌کند.
 
 ### PostgreSQL
 
