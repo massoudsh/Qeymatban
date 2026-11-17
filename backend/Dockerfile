@@ -2,15 +2,30 @@
 
 FROM python:3.12-slim AS builder
 
+# Override with a closer mirror if PyPI is slow or flaky from your network:
+#   docker compose build --build-arg PIP_INDEX_URL=https://mirror.example/simple backend
+ARG PIP_INDEX_URL=https://pypi.org/simple
+
 ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10 \
+    PIP_INDEX_URL=${PIP_INDEX_URL}
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --upgrade pip \
+COPY requirements.txt requirements-benchmark.txt /tmp/
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
     && pip install -r /tmp/requirements.txt
+
+
+# Full model-family set used by app/scripts/benchmark_models.py.
+FROM builder AS benchmark-builder
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r /tmp/requirements-benchmark.txt
 
 
 FROM python:3.12-slim AS runtime
@@ -22,9 +37,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATABASE_URL=sqlite:////app/data/qeymatban.db
 
 # libgomp1 is required by the XGBoost and LightGBM wheels.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 curl gosu \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 curl gosu
 
 RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin qeymatban
 
@@ -49,11 +65,18 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 
+# Same image plus CatBoost/LightGBM for the model benchmark.
+FROM runtime AS benchmark
+
+COPY --from=benchmark-builder /opt/venv /opt/venv
+
+
 FROM runtime AS dev
 
 COPY --chown=qeymatban:qeymatban tests ./tests
 # requirements-dev.txt includes `-r requirements.txt`, resolved relative to /tmp.
 COPY requirements.txt requirements-dev.txt /tmp/
-RUN pip install -r /tmp/requirements-dev.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r /tmp/requirements-dev.txt
 
 CMD ["pytest", "-q", "-p", "no:cacheprovider", "tests"]

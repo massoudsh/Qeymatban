@@ -1,0 +1,7 @@
+# Extra model families benchmarked by app/scripts/benchmark_models.py.
+# Not needed to serve the API: keep them out of the runtime image.
+# tabpfn pulls in PyTorch and makes the image several GB, so it is opt-in.
+-r requirements.txt
+
+catboost>=1.2,<2
+lightgbm>=4.0,<5

@@ -26,9 +26,12 @@ docker compose up --build backend   # همراه با سرویس db
 docker compose run --rm backend python -m app.scripts.train_model /app/data/transactions.csv --output-dir /app/models --promote
 docker compose restart backend
 docker build --target dev -t qeymatban-backend:dev . && docker run --rm qeymatban-backend:dev   # pytest
+docker compose run --rm benchmark python -m app.scripts.benchmark_models --output-dir /app/benchmarks   # + CatBoost/LightGBM
 ```
 
-تصویر runtime کل requirements از جمله TabPFN/PyTorch را نصب می‌کند؛ برای کاهش حجم، `tabpfn` را حذف کنید.
+`requirements.txt` فقط وابستگی‌های سرویس‌دهی است. `requirements-benchmark.txt` مدل‌های اضافی benchmark (CatBoost، LightGBM) را اضافه می‌کند و target `benchmark` آن را نصب می‌کند. TabPFN به‌دلیل PyTorch در هیچ‌کدام نیست؛ در صورت نیاز جداگانه نصب کنید.
+
+Dockerfile با BuildKit cache mount برای pip و apt ساخته می‌شود؛ اگر شبکه هنگام دانلود wheel قطع شد، `PIP_RETRIES` و timeout بالاتر تنظیم شده‌اند و اجرای دوبارهٔ build از cache ادامه می‌دهد.
 
 ## آماده‌سازی داده و مدل
 

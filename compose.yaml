@@ -1,5 +1,16 @@
 name: qeymatban
 
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-qeymatban}:${POSTGRES_PASSWORD:-qeymatban}@db:5432/${POSTGRES_DB:-qeymatban}
+  QEYMATBAN_MODEL_PATH: /app/models/current.joblib
+  QEYMATBAN_API_KEYS: ${QEYMATBAN_API_KEYS:-}
+  QEYMATBAN_CORS_ORIGINS: ${QEYMATBAN_CORS_ORIGINS:-http://localhost:3000}
+
+x-backend-volumes: &backend-volumes
+  - models:/app/models
+  - benchmarks:/app/benchmarks
+  - appdata:/app/data
+
 services:
   db:
     build:
@@ -22,15 +33,8 @@ services:
   backend:
     build:
       context: ./backend
-    environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-qeymatban}:${POSTGRES_PASSWORD:-qeymatban}@db:5432/${POSTGRES_DB:-qeymatban}
-      QEYMATBAN_MODEL_PATH: /app/models/current.joblib
-      QEYMATBAN_API_KEYS: ${QEYMATBAN_API_KEYS:-}
-      QEYMATBAN_CORS_ORIGINS: ${QEYMATBAN_CORS_ORIGINS:-http://localhost:3000}
-    volumes:
-      - models:/app/models
-      - benchmarks:/app/benchmarks
-      - appdata:/app/data
+    environment: *backend-env
+    volumes: *backend-volumes
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -50,6 +54,19 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+  # One-off tasks that need CatBoost/LightGBM, e.g. the model benchmark.
+  #   docker compose run --rm benchmark python -m app.scripts.benchmark_models ...
+  benchmark:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+      target: benchmark
+    environment: *backend-env
+    volumes: *backend-volumes
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

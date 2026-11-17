@@ -57,15 +57,22 @@ docker compose up --build
 - داده‌های دیتابیس، artifact مدل، خروجی benchmark و فایل‌های دادهٔ برنامه در volumeهای `pgdata`، `models`، `benchmarks` و `appdata` نگه‌داری می‌شوند.
 - API بدون artifact مدل بالا می‌آید ولی `POST /v1/valuations` پاسخ 503 می‌دهد تا مدل آموزش داده شود.
 - جدول‌ها هنگام startup از ORM ساخته می‌شوند. `backend/migrations/001_init.sql` نسخهٔ کامل جغرافیایی است و فقط وقتی ستون‌های `location` و `feature_embedding` واقعاً پر می‌شوند باید اجرا شود؛ اجرای آن پیش از ORM به‌دلیل `location NOT NULL` با نوشتن‌های فعلی API سازگار نیست.
-- تصویر API شامل TabPFN و PyTorch است و حجم بالایی دارد؛ اگر فقط مدل‌های درختی لازم است، `tabpfn` را از `backend/requirements.txt` حذف کنید.
+- تصویر API فقط وابستگی‌های سرویس‌دهی را نصب می‌کند (XGBoost، SHAP، scikit-learn)؛ CatBoost، LightGBM و TabPFN فقط برای benchmark لازم‌اند و در تصویر جدا مانده‌اند.
 
 ### آموزش مدل داخل کانتینر
 
 ```bash
-docker compose run --rm backend python -m app.scripts.benchmark_models --rows 2400 --seed 42 --output-dir /app/benchmarks
+docker compose run --rm benchmark python -m app.scripts.benchmark_models --rows 2400 --seed 42 --output-dir /app/benchmarks
 docker compose run --rm backend python -m app.scripts.train_model /app/benchmarks/mock-transactions.csv \
   --benchmark-winner /app/benchmarks/benchmark-winner.json --output-dir /app/models --version dev-local --promote
 docker compose restart backend
+```
+
+سرویس `benchmark` پروفایل `tools` دارد و فقط هنگام فراخوانی با `docker compose run` ساخته می‌شود؛ اگر فقط XGBoost را می‌سنجید، همان سرویس `backend` کافی است. TabPFN چون PyTorch را دانلود می‌کند اصلاً در تصاویر نیست؛ برای استفاده از آن:
+
+```bash
+docker compose run --rm benchmark pip install "tabpfn>=2,<4"
+docker compose run --rm benchmark python -m app.scripts.benchmark_models --output-dir /app/benchmarks
 ```
 
 برای دادهٔ واقعی، CSV تأییدشده را به کانتینر mount کنید و مسیر آن را به `import_transactions` بدهید:
