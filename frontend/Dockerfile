@@ -1,13 +1,17 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS deps
+# Base image is a build arg so a registry mirror can be used without editing
+# this file, e.g. when registry-1.docker.io is unreachable.
+ARG NODE_IMAGE=node:22-alpine
+
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --no-audit --no-fund
 
 
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -16,7 +20,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
 
-FROM node:22-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \

@@ -67,6 +67,29 @@ docker compose up --build
 - تنها جایی که apt لازم است target `benchmark` است، چون wheel لایت‌جی‌بی‌ام `libgomp` را همراه ندارد؛ آن سرویس در پروفایل `tools` است و `docker compose up` عادی آن را build نمی‌کند.
 - کانتینر با root شروع می‌شود تا مالکیت volumeها را درست کند و سپس با `setuid` به کاربر `qeymatban` می‌افتد؛ `curl` و `gosu` در تصویر نیستند.
 
+### وقتی Docker Hub در دسترس نیست
+
+اگر `registry-1.docker.io` جواب ندهد (`EOF` یا timeout)، هیچ ایمیج پایه‌ای pull نمی‌شود. نام همهٔ ایمیج‌ها قابل override است، پس بدون تغییر فایل‌ها می‌توانید از میرور استفاده کنید — در `.env`:
+
+```bash
+POSTGRES_IMAGE=mirror.example/postgres:16
+PYTHON_IMAGE=mirror.example/python:3.12-slim
+NODE_IMAGE=mirror.example/node:22-alpine
+PIP_INDEX_URL=https://mirror.example/pypi/simple
+```
+
+یا فقط برای بیلدهای محلی، رجیستری را در خود داکر تنظیم کنید (`Settings → Docker Engine`):
+
+```json
+{ "registry-mirrors": ["https://mirror.example"] }
+```
+
+اگر تصویر `postgis/postgis:16-3.5` از قبل در کش شما هست و `postgres:16` نه، می‌توانید همان را استفاده کنید. این مسیر به شبیه‌سازی amd64 نیاز دارد، پس روی Apple Silicon کندتر است:
+
+```bash
+docker compose -f compose.yaml -f compose.geo.yaml up -d --build
+```
+
 ### آموزش مدل داخل کانتینر
 
 ```bash

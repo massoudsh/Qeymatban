@@ -15,7 +15,9 @@ services:
   db:
     # Stock multi-arch image: no emulation, no apt install, no pgvector build.
     # For PostGIS/pgvector use compose.geo.yaml (see README).
-    image: postgres:16
+    # POSTGRES_IMAGE lets a registry mirror replace Docker Hub, e.g.
+    #   POSTGRES_IMAGE=mirror.example/postgres:16
+    image: ${POSTGRES_IMAGE:-postgres:16}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-qeymatban}
       POSTGRES_USER: ${POSTGRES_USER:-qeymatban}
@@ -34,6 +36,9 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     environment: *backend-env
     volumes: *backend-volumes
     ports:
@@ -46,6 +51,8 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
     environment:
       QEYMATBAN_API_URL: http://backend:8000
       QEYMATBAN_API_KEY: ${QEYMATBAN_API_KEY:-}
@@ -63,6 +70,9 @@ services:
     build:
       context: ./backend
       target: benchmark
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     environment: *backend-env
     volumes: *backend-volumes
     depends_on:

@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.12-slim AS builder
+# Base image is a build arg so a registry mirror can be used without editing
+# this file, e.g. when registry-1.docker.io is unreachable:
+#   docker compose build --build-arg PYTHON_IMAGE=mirror.example/python:3.12-slim backend
+ARG PYTHON_IMAGE=python:3.12-slim
+
+FROM ${PYTHON_IMAGE} AS builder
 
 # Override with a closer mirror if PyPI is slow or flaky from your network:
 #   docker compose build --build-arg PIP_INDEX_URL=https://mirror.example/simple backend
@@ -28,7 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r /tmp/requirements-benchmark.txt
 
 
-FROM python:3.12-slim AS runtime
+FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
