@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import (
     IS_POSTGRES,
+    ModelVersion,
     Property,
     SessionLocal,
     Valuation,
@@ -18,10 +19,13 @@ from app.db import (
     seed_demo_properties,
     upgrade_postgres_schema,
 )
+from app.logging_config import RequestContextMiddleware, configure_logging
 from app.ml.valuation_service import ValuationService
 from app.schemas.valuation import (
     DashboardStatsResponse,
     ModelStatusResponse,
+    ModelVersionItem,
+    ModelVersionsResponse,
     PropertyFeatures,
     ValuationHistoryItem,
     ValuationHistoryResponse,
@@ -42,6 +46,7 @@ def require_api_key(x_api_key: Annotated[str | None, Header()] = None) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging()
     create_tables()
     if IS_POSTGRES:
         upgrade_postgres_schema()
@@ -57,6 +62,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in os.getenv("QEYMATBAN_CORS_ORIGINS", "http://localhost:3000").split(",")],
@@ -144,6 +150,51 @@ def model_status(request: Request) -> ModelStatusResponse:
     return ModelStatusResponse(
         ready=service is not None,
         model_version=service.model_version if service else None,
+    )
+
+
+@app.get(
+    "/v1/model/versions",
+    response_model=ModelVersionsResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def model_versions(limit: int = 20) -> ModelVersionsResponse:
+    with SessionLocal() as session:
+        rows = (
+            session.query(ModelVersion)
+            .order_by(ModelVersion.trained_at.desc())
+            .limit(max(1, min(limit, 100)))
+            .all()
+        )
+    items = [
+        ModelVersionItem(
+            version=row.version,
+            model_family=row.model_family,
+            trained_at=row.trained_at.isoformat(),
+            training_rows=row.training_rows,
+            validation_rows=row.validation_rows,
+            mae=row.mae,
+            mape=row.mape,
+            data_source=row.data_source,
+            dataset_sha256=row.dataset_sha256,
+            promoted=row.promoted,
+            notes=row.notes,
+        )
+        for row in rows
+    ]
+    current = next((item for item in items if item.promoted), None)
+    # Compare the promoted version with the newest different one, which is what
+    # an operator wants to see after a retrain.
+    previous = next((item for item in items if current and item.version != current.version), None)
+    mape_delta = (
+        current.mape - previous.mape
+        if current and previous and current.mape is not None and previous.mape is not None
+        else None
+    )
+    return ModelVersionsResponse(
+        current=current.version if current else None,
+        items=items,
+        mape_delta=mape_delta,
     )
 
 

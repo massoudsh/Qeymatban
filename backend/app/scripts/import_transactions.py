@@ -11,7 +11,6 @@ from app.ml.pricing_pipeline import FEATURE_COLUMNS
 REQUIRED_COLUMNS = [*FEATURE_COLUMNS, "sold_price"]
 OPTIONAL_COLUMNS = ["id", "sold_date", "source"]
 
-
 def normalize_transactions(source: Path, destination: Path) -> int:
     frame = pd.read_csv(source)
     missing = sorted(set(REQUIRED_COLUMNS) - set(frame.columns))
@@ -52,9 +51,26 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument(
+        "--to-database",
+        action="store_true",
+        help="Also load the validated rows into the properties/transactions tables",
+    )
+    parser.add_argument("--neighborhood", default="نامشخص", help="Fallback neighborhood when the CSV omits it")
+    parser.add_argument("--city", default="تهران", help="Fallback city when the CSV omits it")
     args = parser.parse_args()
+
     rows = normalize_transactions(args.source, args.destination)
     print(f"Imported {rows} validated transactions into {args.destination}")
+
+    if args.to_database:
+        from app.scripts.load_database import load_transactions
+
+        summary = load_transactions(args.destination, neighborhood=args.neighborhood, city=args.city)
+        print(
+            f"Loaded {summary['transactions']} transactions and {summary['properties']} properties "
+            f"into the database ({summary['skipped']} duplicates skipped)"
+        )
 
 
 if __name__ == "__main__":

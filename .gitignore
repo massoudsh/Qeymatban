@@ -34,7 +34,15 @@ venv/
 # Model artifacts and private market data
 backend/models/
 backend/data/
+backend/benchmarks/
 *.joblib
+
+# Local SQLite databases and test caches
+*.db
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.ruff_cache/
 
 # Logs
 *.log

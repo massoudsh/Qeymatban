@@ -64,15 +64,55 @@ ln -sfn valuation-<version>.joblib models/current.joblib
 
 `mock-transactions.csv` فقط برای اعتبارسنجی فنی است و نباید معیار کیفیت یا مدل production تلقی شود. برای دادهٔ واقعی، همان benchmark را روی معاملات بسته‌شدهٔ canonical اجرا کنید و سپس winner file آن را به `train_model` بدهید.
 
+## Retrain دوره‌ای، نسخه‌بندی و rollback
+
+`retrain` از جدول `transactions` آموزش می‌دهد، متریک‌ها را در جدول `model_versions` ثبت می‌کند و فقط وقتی نسخهٔ جدید از نسخهٔ جاری بدتر نباشد آن را promote می‌کند (تحمل پیش‌فرض ۲٪).
+
+```bash
+python -m app.scripts.retrain                       # آموزش از دیتابیس
+python -m app.scripts.retrain --data data/x.csv     # یا از CSV
+python -m app.scripts.retrain --rollback            # بازگرداندن نسخهٔ قبلی
+python -m app.scripts.evaluate --model models/current.joblib --data golden.csv
+```
+
+برای زمان‌بندی، همان دستور را در cron بگذارید:
+
+```cron
+0 3 * * * cd /srv/qeymatban/backend && .venv/bin/python -m app.scripts.retrain --output-dir models >> /var/log/qeymatban-retrain.log 2>&1
+```
+
+`evaluate` روی یک dataset طلایی، MAPE و نسبت MAE را می‌سنجد و در صورت عبور از آستانه با کد خروجی غیرصفر تمام می‌شود؛ مناسب برای gate کردن استقرار.
+
+## ورود داده به دیتابیس
+
+```bash
+python -m app.scripts.import_transactions raw.csv data/transactions.csv --to-database
+# یا فقط بارگذاری فایل از قبل اعتبارسنجی‌شده:
+python -m app.scripts.load_database data/transactions.csv
+```
+
+بارگذاری idempotent است (شناسهٔ تراکنش کلید یکتاست) و برای هر ملک `feature_embedding` می‌سازد.
+
 ## API
 
 - `GET /health` — سلامت process
 - `GET /v1/model/status` — آمادگی و نسخه مدل
+- `GET /v1/model/versions` — نسخه‌های ثبت‌شده، متریک‌ها، نسخهٔ جاری و اختلاف MAPE
 - `POST /v1/valuations` — بازه قیمت، confidence، SHAP، comparables و `valuation_id` ذخیره‌شده
 - `GET /v1/valuations?limit=20` — تاریخچهٔ ارزش‌گذاری‌ها برای داشبورد
 - `GET /v1/valuations/stats` — تعداد، میانگین confidence، تحلیل‌های ۳۰ روز اخیر و میانهٔ قیمت
 
-اگر `QEYMATBAN_API_KEYS` تنظیم شود، همهٔ endpointهای `/v1/valuations` هدر `X-API-Key` معتبر می‌خواهند. چند کلید با کاما جدا می‌شوند.
+اگر `QEYMATBAN_API_KEYS` تنظیم شود، همهٔ endpointهای `/v1/valuations` و `/v1/model/versions` هدر `X-API-Key` معتبر می‌خواهند. چند کلید با کاما جدا می‌شوند.
+
+## لاگ‌ها
+
+لاگ‌ها به‌صورت JSON و یک‌شیء در هر خط با `request_id`، مسیر، status و `duration_ms` نوشته می‌شوند. برای خروجی خوانا در توسعه:
+
+```bash
+LOG_FORMAT=plain LOG_LEVEL=DEBUG uvicorn app.main:app --reload
+```
+
+هر پاسخ هدر `X-Request-Id` برمی‌گرداند تا بتوان لاگ را به درخواست کاربر وصل کرد.
 
 ## دیتابیس
 

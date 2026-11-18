@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, create_engine, select, text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./qeymatban.db")
@@ -52,6 +52,10 @@ class Property(Base):
     view_score: Mapped[int] = mapped_column(Integer)
     access_score: Mapped[int] = mapped_column(Integer)
     listed_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Standardized feature vector for comparable lookups. Stored as JSON so the
+    # same ORM works on SQLite and PostgreSQL; a pgvector column can replace it
+    # later without changing the write path.
+    feature_embedding: Mapped[list[float] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
@@ -96,6 +100,30 @@ class ValuationComparable(Base):
     rank: Mapped[int] = mapped_column(Integer)
 
 
+class ModelVersion(Base):
+    """Registry entry for one trained artifact: metrics plus promotion state.
+
+    Exactly one row may be `promoted` at a time; the retrain job flips that flag
+    only when a candidate is not worse than the current version, which is also
+    the rollback path (promote the previous row again).
+    """
+
+    __tablename__ = "model_versions"
+
+    version: Mapped[str] = mapped_column(String(100), primary_key=True)
+    model_family: Mapped[str] = mapped_column(String(40), default="xgboost")
+    artifact_path: Mapped[str] = mapped_column(String(500))
+    trained_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    training_rows: Mapped[int] = mapped_column(Integer, default=0)
+    validation_rows: Mapped[int] = mapped_column(Integer, default=0)
+    mae: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mape: Mapped[float | None] = mapped_column(Float, nullable=True)
+    dataset_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    data_source: Mapped[str] = mapped_column(String(200), default="unknown")
+    promoted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
 def create_tables() -> None:
     Base.metadata.create_all(bind=engine)
 
@@ -107,6 +135,7 @@ def upgrade_postgres_schema() -> list[str]:
     statements = {
         "properties": {
             "listed_price": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS listed_price NUMERIC(16,0)",
+            "feature_embedding": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS feature_embedding JSONB",
             "status": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'",
             "created_at": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
             "updated_at": "ALTER TABLE properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()",

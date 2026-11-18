@@ -57,6 +57,28 @@ class ModelStatusResponse(BaseModel):
     model_version: str | None = None
 
 
+class ModelVersionItem(BaseModel):
+    version: str
+    model_family: str
+    trained_at: str
+    training_rows: int
+    validation_rows: int
+    mae: float | None = None
+    mape: float | None = None
+    data_source: str
+    dataset_sha256: str | None = None
+    promoted: bool
+    notes: str | None = None
+
+
+class ModelVersionsResponse(BaseModel):
+    current: str | None = None
+    items: list[ModelVersionItem]
+    # Signed improvement of the promoted version over the previous one, in MAPE
+    # percentage points. Negative means the current model is better.
+    mape_delta: float | None = None
+
+
 class ValuationHistoryItem(BaseModel):
     valuation_id: str
     property_id: str
