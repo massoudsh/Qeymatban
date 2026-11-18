@@ -39,7 +39,7 @@ jobs:
       - name: Generate Python SBOM
         run: cyclonedx-py requirements backend/requirements.txt -o sbom-python.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom-python.json
