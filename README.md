@@ -28,6 +28,24 @@ Qeymatban با استفاده از هوش مصنوعی، قیمت یک ملک ر
 - SaaS برای دفاتر و پلتفرم‌های آگهی (B2B)
 - API ارزش‌گذاری برای مؤسسات مالی و بازیگران بزرگ‌تر بازار
 
+## شروع سریع
+
+```bash
+git clone https://github.com/massoudsh/Qeymatban.git
+cd Qeymatban
+cp .env.example .env          # رمز دیتابیس و کلید API را تنظیم کنید
+docker compose up --build
+```
+
+پنل روی `http://localhost:3000` و API روی `http://localhost:8000/docs` بالا می‌آید. بدون اجرای Docker:
+
+```bash
+cd backend && pip install -r requirements-dev.txt
+uvicorn app.main:app --reload          # SQLite، جدول‌ها خودکار ساخته می‌شوند
+```
+
+API بدون artifact مدل بالا می‌آید اما `POST /v1/valuations` تا آموزش مدل پاسخ 503 می‌دهد.
+
 ## ساختار پروژه
 
 ```
@@ -124,6 +142,15 @@ docker run --rm qeymatban-backend:dev
 
 - چشم‌انداز کامل محصول: [`docs/vision.md`](docs/vision.md)
 - معماری فنی و stack: [`docs/architecture.md`](docs/architecture.md)
+- نقشه معماری یک‌صفحه‌ای و چرخهٔ عمر مدل: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- مدل تهدید و کنترل‌های امنیتی: [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md)
+
+## امنیت و ارزیابی کیفیت
+
+- `gitleaks` روی هر push اجرا می‌شود؛ کلیدها فقط در env سمت سرور نگه داشته می‌شوند.
+- CodeQL روی Python و TypeScript/JavaScript و SBOM (CycloneDX) در CI تولید می‌شود.
+- کیفیت مدل با `app/scripts/evaluate.py` روی dataset طلایی سنجیده می‌شود و آستانه‌های MAPE/MAE مانع استقرار نسخهٔ بدتر می‌شوند.
+- `app/scripts/retrain.py` فقط نسخه‌ای را promote می‌کند که از نسخهٔ جاری بدتر نباشد و مسیر rollback دارد.
 
 ## وضعیت
 
